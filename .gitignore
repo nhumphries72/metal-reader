@@ -3,4 +3,6 @@ venv/ .venv/ pycache/ *.pyc *.pyo
 *.log tmp/ temp
 requirements.txt
 Dockerfile
+logo_genre_classifier.pt
+ml_genre_dataset.csv
 /dist /build
