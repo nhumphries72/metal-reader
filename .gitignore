@@ -1,0 +1,6 @@
+venv/ .venv/ pycache/ *.pyc *.pyo
+.vscode/ ./idea
+*.log tmp/ temp
+requirements.txt
+Dockerfile
+/dist /build

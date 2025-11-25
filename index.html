@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Logo Classification Client</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            sans: ['Inter', 'sans-serif'],
+                        },
+                        colors: {
+                            'dark-bg': '#0F172A',
+                            'card-bg': '#1E293B',
+                            'accent-primary': '#3B82F6',
+                            'text-light': '#F8FAFC'
+                        }
+                    }
+                }
+            }
+        </script>
+        <style>
+            body {
+                background-color: #0F172A;
+                color: #F8FAFC;
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+            .progress-bar-segment {
+                transition: width 0.7s ease-out, background-color 0.3s;
+            }
+        </style>
+    </head>
+    <body class="font-sans">
+
+        <div id="app-container" class="w-full max-w-lg bg-card-bg p-8 rounded-xl shadow-2xl border border-slate-700">
+            <h1 class="text-3xl font-bold text-center text-accent-primary mb-2">
+                Genre Classifier
+            </h1>
+            <p class="text-center text-sm mb-6 text-slate-400">Upload a metal band logo to classify its genre.</p>
+
+            <div class="mb-6 p-5 border-2 border-slate-600 border-dashed rounded-lg flex flex-col items-center justify-center">
+                <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="previewImage(event)">
+                <label for="logoInput" id="uploadLabel" class="cursor-pointer text-slate-400 hover:text-accent-secondary transition duration-300 text-center p-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM6 4h7v4h4v12H6z"/>
+                    </svg>
+                    Click to upload logo (PNG/JPG)
+                </label>
+                <img id="imagePreview" src="" alt="Image Preview" class="max-h-56 mt-4 hidden rounded-lg shadow-lg border border-slate-600">
+            </div>
+
+            <button id="classifyButton" onclick="classifyLogo()" disabled class="w-full py-3 bg-accent-primary hover:bg-blue-600 text-text-light font-semibold text-lg rounded-lg transition duration-300 shadow-lg disabled:bg-slate-600 disabled:cursor-not-allowed">
+                Classify logo
+            </button>
+
+            <div id="statusMessage" class="mt-4 text-center text-accent-secondary font-medium h-6"></div>
+
+            <div id="resultsContainer" class="mt-8 p-6 bg-slate-700/50 rounded-lg hidden border border-slate-700">
+                <h2 class="text-x1 font-semibold text-accent-primary mb-4 border-b border-slate-600 pb-2">Prediction Breakdown</h2>
+                <div id="predictionOutput" class="space-y-4">
+                    <!-- JavaScript will put stuff here -->
+                </div>
+            </div>
+
+            <div class="mt-8 pt-4 border-t border-slate-700 text-xs text-center text-slate-500">
+                API Endpoint: <span id="apiUrlDisplay" class="font-mono text-slate-400">https://metal-reader-classifier-763855867886.us-west1.run.app/predict</span>
+            </div>
+        </div>
+
+        <script>
+            const apiUrl = 'https://metal-reader-classifier-763855867886.us-west1.run.app/predict';
+            const logoInput = document.getElementById('logoInput');
+            const classifyButton = document.getElementById('classifyButton');
+            const imagePreview = document.getElementById('imagePreview');
+            const uploadLabel = document.getElementById('uploadLabel');
+            const statusMessage = document.getElementById('statusMessage');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const predictionOutput = document.getElementById('predictionOutput');
+
+            document.getElementById('apiUrlDisplay').textContent = apiUrl;
+
+            function previewImage(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        imagePreview.src = e.target.result;
+                        imagePreview.classList.remove('hidden');
+                        uploadLabel.classList.remove('hidden');
+                        classifyButton.disabled = false;
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    imagePreview.classList.add('hidden');
+                    uploadLabel.classList.add('hidden');
+                    classifyButton.disabled = true;
+                }
+                resultsContainer.classList.add('hidden');
+                statusMessage.textContent = '';
+                predictionOutput.innerHTML = '';
+            }
+
+            function resizeImageToBlob(file, targetSize = 244) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = targetSize;
+                        canvas.height = targetSize;
+                        const ctx = canvas.getContext('2d');
+
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+
+                        ctx.drawImage(img, 0, 0, targetSize, targetSize);
+
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error("Canvas failed to create blob"));
+                            }
+                        }, file.type);
+                    };
+                    img.onerror = (e) => reject(new Error("Failed to load image for resizing"));
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+
+            function renderResult(genre, confidence) {
+                const confidencePercent = (confidence * 100).toFixed(0);
+                predictionOutput.innerHTML = `
+                    <div class="p-4 bg-slate-800 rounded-lg shadow-md">
+                        <p class="text-sm text-slate-400 font-medium">Predicted Genre</p>
+                        <p class="text-xl font-extrabold text-accent-primary uppercase">${genre}</p>
+                    </div>
+                    <div class="p-4 bg-slate-800 rounded-lg shadow-md">
+                        <p class="text-sm text-slate-400 font-medium">Confidence Score</p>
+                        <p class="text-l font-bold text-text-light">${confidencePercent}%</p>
+                    </div>
+                `;
+            }
+
+            async function classifyLogo() {
+                const file = logoInput.files[0];
+                if (!file) return;
+
+                classifyButton.disabled = true;
+                statusMessage.textContent = 'Analyzing logo...';
+                resultsContainer.classList.add('hidden');
+
+                let resizedBlob;
+                try {
+                    resizedBlob = await resizeImageToBlob(file, 244);
+                    statusMessage.textContent = 'Image resized. Sending to model...';
+                } catch (e) {
+                    console.error("Image resizing failed: ", e)
+                    statusMessage.textContent = 'Error: failed to process image for classification';
+                    classifyButton.disabled = false;
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', resizedBlob, file.name);
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorDetail = await response.json().catch(() => ({detail: 'Unknown error occurred.'}));
+                        throw new Error(`API Error ${response.status}: ${errorDetail.detail || 'Service unavailable.'}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (!result.predicted_genre || result.confidence === undefined) {
+                        throw new Error("API response format missing required 'predicted_genre' or 'confidence' ");
+                    }
+
+                    renderResult(result.predicted_genre, result.confidence);
+
+                    statusMessage.textContent = 'Classification complete';
+                    resultsContainer.classList.remove('hidden');
+                    uploadLabel.classList.remove('hidden')
+
+                } catch (error) {
+                    console.error("Classification failed:", error);
+                    statusMessage.textContent = `Error: classification failed. See console for details.`;
+                    resultsContainer.classList.add('hidden');
+                } finally {
+                    classifyButton.disabled = false;
+                }
+            }
+        </script>
+    </body>
+</html>
